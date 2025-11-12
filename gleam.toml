@@ -1,0 +1,19 @@
+name = "squall_cache"
+version = "0.1.0"
+target = "javascript"
+
+description = "Relay-style GraphQL cache for Lustre apps"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "bigmoves", repo = "squall_cache" }
+
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"
+gleam_http = ">= 4.3.0 and < 5.0.0"
+gleam_fetch = ">= 1.0.0 and < 2.0.0"
+gleam_javascript = ">= 1.0.0 and < 2.0.0"
+lustre = ">= 5.0.0 and < 6.0.0"
+squall = { path = "/Users/chadmiller/code/squall" }
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
