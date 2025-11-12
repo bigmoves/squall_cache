@@ -16,7 +16,7 @@ A normalized GraphQL cache for Lustre applications with optimistic mutation supp
 ## Installation
 
 ```sh
-gleam add squall_cache@1
+gleam add squall_cache@0.1.0
 ```
 
 ## Basic Usage
