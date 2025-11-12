@@ -3,6 +3,8 @@
 [![Package Version](https://img.shields.io/hexpm/v/squall_cache)](https://hex.pm/packages/squall_cache)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/squall_cache/)
 
+**Note: This library is currently unstable and under active development. APIs may change without notice.**
+
 A normalized GraphQL cache for Lustre applications with optimistic mutation support. Built to work with the [Squall](https://github.com/bigmoves/squall) GraphQL client.
 
 ## Features
