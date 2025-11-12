@@ -15,9 +15,7 @@ A normalized GraphQL cache for Lustre applications with optimistic mutation supp
 
 ## Installation
 
-```sh
-gleam add squall_cache@0.1.0
-```
+Use latest commit, still testing on a project before it's released.
 
 ## Basic Usage
 
@@ -190,7 +188,7 @@ import gleam/json
 import lustre
 import lustre/effect.{type Effect}
 import squall_cache
-import squall/registry
+import squall/unstable_registry
 
 pub type Model {
   Model(cache: squall_cache.Cache, registry: registry.Registry)

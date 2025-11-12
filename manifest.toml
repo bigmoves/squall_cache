@@ -17,7 +17,7 @@ packages = [
   { name = "houdini", version = "1.2.0", build_tools = ["gleam"], requirements = [], otp_app = "houdini", source = "hex", outer_checksum = "5DB1053F1AF828049C2B206D4403C18970ABEF5C18671CA3C2D2ED0DD64F6385" },
   { name = "lustre", version = "5.4.0", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_json", "gleam_otp", "gleam_stdlib", "houdini"], otp_app = "lustre", source = "hex", outer_checksum = "40E097BABCE65FB7C460C073078611F7F5802EB07E1A9BFB5C229F71B60F8E50" },
   { name = "simplifile", version = "2.3.1", build_tools = ["gleam"], requirements = ["filepath", "gleam_stdlib"], otp_app = "simplifile", source = "hex", outer_checksum = "957E0E5B75927659F1D2A1B7B75D7B9BA96FAA8D0C53EA71C4AD9CD0C6B848F6" },
-  { name = "squall", version = "1.0.1", build_tools = ["gleam"], requirements = ["argv", "filepath", "glam", "gleam_http", "gleam_httpc", "gleam_json", "gleam_stdlib", "simplifile", "swell"], otp_app = "squall", source = "hex", outer_checksum = "BFAA907D1EDC1BE8505A0D57B1073FBD44D98B565BDFD782D020647979291951" },
+  { name = "squall", version = "1.1.1", build_tools = ["gleam"], requirements = ["argv", "filepath", "glam", "gleam_http", "gleam_httpc", "gleam_json", "gleam_stdlib", "simplifile", "swell"], otp_app = "squall", source = "hex", outer_checksum = "36C271FFB544C88F02DD35151C2C42BF63CE9A3F3069B92A5B1CC681B5A4028B" },
   { name = "swell", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "swell", source = "hex", outer_checksum = "CA28A95AB9A01E51D1FCFC0FC4F7102C7F47D04B9711138248D08C2A9F1FE6A3" },
 ]
 

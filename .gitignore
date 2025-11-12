@@ -1,3 +1,5 @@
 build/
 *.ez
 .DS_Store
+.lustre
+erl_crash.dump

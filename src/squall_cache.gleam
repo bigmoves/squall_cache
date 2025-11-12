@@ -14,7 +14,7 @@ import gleam/set.{type Set}
 import gleam/string
 import lustre/effect.{type Effect}
 import squall
-import squall/registry.{type Registry}
+import squall/unstable_registry.{type Registry, get as registry_get}
 
 /// Result of a query lookup - Loading, Failed, or Data
 pub type QueryResult(data) {
@@ -124,7 +124,12 @@ pub fn store_query(
 
       // Store the normalized data (with entity references)
       let normalized_data_str = json.to_string(normalized_data)
-      let entry = CacheEntry(data: normalized_data_str, timestamp: timestamp, status: Fresh)
+      let entry =
+        CacheEntry(
+          data: normalized_data_str,
+          timestamp: timestamp,
+          status: Fresh,
+        )
       let new_queries = dict.insert(cache.queries, key, entry)
 
       Cache(..cache, queries: new_queries, entities: updated_entities)
@@ -159,10 +164,11 @@ fn extract_entities_with_path(
             Ok(id) -> {
               // Try to get __typename for proper cache keying (Relay-style)
               let typename = case dict.get(obj, "__typename") {
-                Ok(typename_value) -> case decode.run(typename_value, decode.string) {
-                  Ok(t) -> t
-                  Error(_) -> infer_typename_from_path(path)
-                }
+                Ok(typename_value) ->
+                  case decode.run(typename_value, decode.string) {
+                    Ok(t) -> t
+                    Error(_) -> infer_typename_from_path(path)
+                  }
                 Error(_) -> infer_typename_from_path(path)
               }
 
@@ -170,32 +176,40 @@ fn extract_entities_with_path(
               let global_id = typename <> ":" <> id
 
               // This is an entity - extract it and recursively extract nested entities
-              let field_results = dict.to_list(obj)
+              let field_results =
+                dict.to_list(obj)
                 |> list.map(fn(pair) {
                   let #(k, v) = pair
                   let field_path = list.append(path, [k])
-                  let #(nested_entities, normalized_value) = extract_entities_with_path(v, field_path)
+                  let #(nested_entities, normalized_value) =
+                    extract_entities_with_path(v, field_path)
                   #(k, nested_entities, normalized_value)
                 })
 
               // Collect all nested entities
-              let all_nested_entities = list.fold(field_results, dict.new(), fn(acc, result) {
-                let #(_, entities, _) = result
-                merge_entities(acc, entities)
-              })
+              let all_nested_entities =
+                list.fold(field_results, dict.new(), fn(acc, result) {
+                  let #(_, entities, _) = result
+                  merge_entities(acc, entities)
+                })
 
               // Build the entity with normalized field values
-              let entity_json = list.map(field_results, fn(result) {
-                let #(k, _, normalized) = result
-                #(k, normalized)
-              })
-              |> json.object
+              let entity_json =
+                list.map(field_results, fn(result) {
+                  let #(k, _, normalized) = result
+                  #(k, normalized)
+                })
+                |> json.object
 
               // Merge this entity with all nested entities using the global_id
-              let entities_dict = dict.insert(all_nested_entities, global_id, entity_json)
+              let entities_dict =
+                dict.insert(all_nested_entities, global_id, entity_json)
 
               // Return reference with the global_id
-              #(entities_dict, json.object([#("__ref", json.string(global_id))]))
+              #(
+                entities_dict,
+                json.object([#("__ref", json.string(global_id))]),
+              )
             }
             Error(_) -> {
               // Has id but not a string, recurse into fields
@@ -223,17 +237,20 @@ fn extract_entities_with_path(
             }
             False -> {
               // Regular array - process normally
-              let results = list.map(items, fn(item) {
-                extract_entities_with_path(item, path)
-              })
-              let all_entities = list.fold(results, dict.new(), fn(acc, result) {
-                let #(entities, _) = result
-                merge_entities(acc, entities)
-              })
-              let normalized_items = list.map(results, fn(result) {
-                let #(_, norm) = result
-                norm
-              })
+              let results =
+                list.map(items, fn(item) {
+                  extract_entities_with_path(item, path)
+                })
+              let all_entities =
+                list.fold(results, dict.new(), fn(acc, result) {
+                  let #(entities, _) = result
+                  merge_entities(acc, entities)
+                })
+              let normalized_items =
+                list.map(results, fn(result) {
+                  let #(_, norm) = result
+                  norm
+                })
               #(all_entities, json.array(normalized_items, fn(x) { x }))
             }
           }
@@ -259,16 +276,17 @@ fn infer_typename_from_path(path: List(String)) -> String {
       // Skip common wrapper keys
       "data" | "results" | "edges" | "node" -> Error(Nil)
       // Plurals - try to singularize
-      _ -> case string.ends_with(segment, "s") {
-        True -> {
-          // Remove trailing 's' by taking all but last character
-          let len = string.length(segment)
-          let singular = string.slice(segment, 0, len - 1)
-          // Capitalize first letter
-          Ok(capitalize(singular))
+      _ ->
+        case string.ends_with(segment, "s") {
+          True -> {
+            // Remove trailing 's' by taking all but last character
+            let len = string.length(segment)
+            let singular = string.slice(segment, 0, len - 1)
+            // Capitalize first letter
+            Ok(capitalize(singular))
+          }
+          False -> Ok(capitalize(segment))
         }
-        False -> Ok(capitalize(segment))
-      }
     }
   })
   |> result.unwrap("Entity")
@@ -297,10 +315,11 @@ fn is_edges_array(value: decode.Dynamic) -> Bool {
       // Check if first item is an edge (has "node")
       case items {
         [] -> False
-        [first, ..] -> case decode.run(first, decode.dict(decode.string, decode.dynamic)) {
-          Ok(obj) -> is_connection_edge(obj)
-          Error(_) -> False
-        }
+        [first, ..] ->
+          case decode.run(first, decode.dict(decode.string, decode.dynamic)) {
+            Ok(obj) -> is_connection_edge(obj)
+            Error(_) -> False
+          }
       }
     }
     Error(_) -> False
@@ -319,30 +338,43 @@ fn extract_connection_edges(
       let #(entities_acc, edges_acc, seen_ids) = acc
 
       // Try to extract the edge as an object
-      case decode.run(edge_dynamic, decode.dict(decode.string, decode.dynamic)) {
+      case
+        decode.run(edge_dynamic, decode.dict(decode.string, decode.dynamic))
+      {
         Ok(edge_obj) -> {
           // Extract the node to check its ID
           case dict.get(edge_obj, "node") {
             Ok(node_value) -> {
               // Check if node has an ID for deduplication
-              let node_id = case decode.run(node_value, decode.dict(decode.string, decode.dynamic)) {
-                Ok(node_obj) -> case dict.get(node_obj, "id") {
-                  Ok(id_value) -> case decode.run(id_value, decode.string) {
-                    Ok(id) -> {
-                      // Try to get typename for full global ID
-                      let typename = case dict.get(node_obj, "__typename") {
-                        Ok(typename_value) -> case decode.run(typename_value, decode.string) {
-                          Ok(t) -> t
-                          Error(_) -> "Node"
+              let node_id = case
+                decode.run(
+                  node_value,
+                  decode.dict(decode.string, decode.dynamic),
+                )
+              {
+                Ok(node_obj) ->
+                  case dict.get(node_obj, "id") {
+                    Ok(id_value) ->
+                      case decode.run(id_value, decode.string) {
+                        Ok(id) -> {
+                          // Try to get typename for full global ID
+                          let typename = case dict.get(node_obj, "__typename") {
+                            Ok(typename_value) ->
+                              case decode.run(typename_value, decode.string) {
+                                Ok(t) -> t
+                                Error(_) -> "Node"
+                              }
+                            Error(_) ->
+                              infer_typename_from_path(
+                                list.append(path, ["node"]),
+                              )
+                          }
+                          option.Some(typename <> ":" <> id)
                         }
-                        Error(_) -> infer_typename_from_path(list.append(path, ["node"]))
+                        Error(_) -> option.None
                       }
-                      option.Some(typename <> ":" <> id)
-                    }
                     Error(_) -> option.None
                   }
-                  Error(_) -> option.None
-                }
                 Error(_) -> option.None
               }
 
@@ -356,33 +388,55 @@ fn extract_connection_edges(
                     }
                     False -> {
                       // New node - process the full edge
-                      let #(edge_entities, normalized_edge) = extract_from_object_with_path(edge_obj, path)
-                      let merged_entities = merge_entities(entities_acc, edge_entities)
-                      #(merged_entities, list.append(edges_acc, [normalized_edge]), set.insert(seen_ids, id))
+                      let #(edge_entities, normalized_edge) =
+                        extract_from_object_with_path(edge_obj, path)
+                      let merged_entities =
+                        merge_entities(entities_acc, edge_entities)
+                      #(
+                        merged_entities,
+                        list.append(edges_acc, [normalized_edge]),
+                        set.insert(seen_ids, id),
+                      )
                     }
                   }
                 }
                 option.None -> {
                   // No ID - process normally without deduplication
-                  let #(edge_entities, normalized_edge) = extract_from_object_with_path(edge_obj, path)
-                  let merged_entities = merge_entities(entities_acc, edge_entities)
-                  #(merged_entities, list.append(edges_acc, [normalized_edge]), seen_ids)
+                  let #(edge_entities, normalized_edge) =
+                    extract_from_object_with_path(edge_obj, path)
+                  let merged_entities =
+                    merge_entities(entities_acc, edge_entities)
+                  #(
+                    merged_entities,
+                    list.append(edges_acc, [normalized_edge]),
+                    seen_ids,
+                  )
                 }
               }
             }
             Error(_) -> {
               // No node field - process as regular object
-              let #(edge_entities, normalized_edge) = extract_from_object_with_path(edge_obj, path)
+              let #(edge_entities, normalized_edge) =
+                extract_from_object_with_path(edge_obj, path)
               let merged_entities = merge_entities(entities_acc, edge_entities)
-              #(merged_entities, list.append(edges_acc, [normalized_edge]), seen_ids)
+              #(
+                merged_entities,
+                list.append(edges_acc, [normalized_edge]),
+                seen_ids,
+              )
             }
           }
         }
         Error(_) -> {
           // Not an object - process as regular value
-          let #(edge_entities, normalized_edge) = extract_entities_with_path(edge_dynamic, path)
+          let #(edge_entities, normalized_edge) =
+            extract_entities_with_path(edge_dynamic, path)
           let merged_entities = merge_entities(entities_acc, edge_entities)
-          #(merged_entities, list.append(edges_acc, [normalized_edge]), seen_ids)
+          #(
+            merged_entities,
+            list.append(edges_acc, [normalized_edge]),
+            seen_ids,
+          )
         }
       }
     })
@@ -395,26 +449,30 @@ fn extract_from_object_with_path(
   obj: Dict(String, decode.Dynamic),
   path: List(String),
 ) -> #(Dict(String, Json), Json) {
-  let field_results = dict.to_list(obj)
+  let field_results =
+    dict.to_list(obj)
     |> list.map(fn(pair) {
       let #(key, value) = pair
       let field_path = list.append(path, [key])
-      let #(entities, normalized) = extract_entities_with_path(value, field_path)
+      let #(entities, normalized) =
+        extract_entities_with_path(value, field_path)
       #(key, entities, normalized)
     })
 
   // Merge all entities
-  let all_entities = list.fold(field_results, dict.new(), fn(acc, result) {
-    let #(_, entities, _) = result
-    merge_entities(acc, entities)
-  })
+  let all_entities =
+    list.fold(field_results, dict.new(), fn(acc, result) {
+      let #(_, entities, _) = result
+      merge_entities(acc, entities)
+    })
 
   // Build normalized object
-  let normalized_obj = list.map(field_results, fn(result) {
-    let #(key, _, normalized) = result
-    #(key, normalized)
-  })
-  |> json.object
+  let normalized_obj =
+    list.map(field_results, fn(result) {
+      let #(key, _, normalized) = result
+      #(key, normalized)
+    })
+    |> json.object
 
   #(all_entities, normalized_obj)
 }
@@ -446,7 +504,10 @@ fn merge_json_objects(existing: Json, new: Json) -> Json {
   let new_str = json.to_string(new)
 
   // Parse both as Dynamic and decode as dicts
-  case json.parse(existing_str, decode.dynamic), json.parse(new_str, decode.dynamic) {
+  case
+    json.parse(existing_str, decode.dynamic),
+    json.parse(new_str, decode.dynamic)
+  {
     Ok(existing_dyn), Ok(new_dyn) -> {
       case
         decode.run(existing_dyn, decode.dict(decode.string, decode.dynamic)),
@@ -459,21 +520,22 @@ fn merge_json_objects(existing: Json, new: Json) -> Json {
             |> list.unique
 
           // Merge fields: new overrides existing
-          let merged_fields = list.filter_map(all_keys, fn(key) {
-            // Prefer new value if present
-            let maybe_value = case dict.get(new_dict, key) {
-              Ok(v) -> Ok(v)
-              Error(_) -> dict.get(existing_dict, key)
-            }
-
-            case maybe_value {
-              Ok(dynamic_value) -> {
-                // Convert Dynamic to Json
-                Ok(#(key, dynamic_to_json(dynamic_value)))
+          let merged_fields =
+            list.filter_map(all_keys, fn(key) {
+              // Prefer new value if present
+              let maybe_value = case dict.get(new_dict, key) {
+                Ok(v) -> Ok(v)
+                Error(_) -> dict.get(existing_dict, key)
               }
-              Error(_) -> Error(Nil)
-            }
-          })
+
+              case maybe_value {
+                Ok(dynamic_value) -> {
+                  // Convert Dynamic to Json
+                  Ok(#(key, dynamic_to_json(dynamic_value)))
+                }
+                Error(_) -> Error(Nil)
+              }
+            })
 
           // Construct merged JSON object
           json.object(merged_fields)
@@ -486,11 +548,7 @@ fn merge_json_objects(existing: Json, new: Json) -> Json {
 }
 
 /// Mark a query as loading
-pub fn mark_loading(
-  cache: Cache,
-  query_name: String,
-  variables: Json,
-) -> Cache {
+pub fn mark_loading(cache: Cache, query_name: String, variables: Json) -> Cache {
   let key = make_query_key(query_name, variables)
 
   case dict.get(cache.queries, key) {
@@ -545,10 +603,11 @@ pub fn apply_optimistic_update(
   // Get the current entity value (checking optimistic first, then regular entities)
   let current = case dict.get(cache.optimistic_entities, entity_id) {
     Ok(entity) -> option.Some(entity)
-    Error(_) -> case dict.get(cache.entities, entity_id) {
-      Ok(entity) -> option.Some(entity)
-      Error(_) -> option.None
-    }
+    Error(_) ->
+      case dict.get(cache.entities, entity_id) {
+        Ok(entity) -> option.Some(entity)
+        Error(_) -> option.None
+      }
   }
 
   // Apply the updater to get the new optimistic value
@@ -557,8 +616,16 @@ pub fn apply_optimistic_update(
   // Store the optimistic entity and track the mutation
   Cache(
     ..cache,
-    optimistic_entities: dict.insert(cache.optimistic_entities, entity_id, optimistic_entity),
-    optimistic_mutations: dict.insert(cache.optimistic_mutations, mutation_id, entity_id),
+    optimistic_entities: dict.insert(
+      cache.optimistic_entities,
+      entity_id,
+      optimistic_entity,
+    ),
+    optimistic_mutations: dict.insert(
+      cache.optimistic_mutations,
+      mutation_id,
+      entity_id,
+    ),
   )
 }
 
@@ -569,7 +636,10 @@ pub fn rollback_optimistic(cache: Cache, mutation_id: String) -> Cache {
       Cache(
         ..cache,
         optimistic_entities: dict.delete(cache.optimistic_entities, entity_id),
-        optimistic_mutations: dict.delete(cache.optimistic_mutations, mutation_id),
+        optimistic_mutations: dict.delete(
+          cache.optimistic_mutations,
+          mutation_id,
+        ),
       )
     }
     Error(_) -> cache
@@ -578,7 +648,11 @@ pub fn rollback_optimistic(cache: Cache, mutation_id: String) -> Cache {
 
 /// Commit an optimistic update (called when mutation succeeds)
 /// The real entity data should already be in the cache from store_query
-pub fn commit_optimistic(cache: Cache, mutation_id: String, response_body: String) -> Cache {
+pub fn commit_optimistic(
+  cache: Cache,
+  mutation_id: String,
+  response_body: String,
+) -> Cache {
   case dict.get(cache.optimistic_mutations, mutation_id) {
     Ok(entity_id) -> {
       // Parse and normalize the mutation response
@@ -587,21 +661,34 @@ pub fn commit_optimistic(cache: Cache, mutation_id: String, response_body: Strin
           let #(extracted_entities, _normalized) = extract_entities(data)
 
           // Merge extracted entities into the main entity store
-          let updated_entities = merge_entities(cache.entities, extracted_entities)
+          let updated_entities =
+            merge_entities(cache.entities, extracted_entities)
 
           Cache(
             ..cache,
             entities: updated_entities,
-            optimistic_entities: dict.delete(cache.optimistic_entities, entity_id),
-            optimistic_mutations: dict.delete(cache.optimistic_mutations, mutation_id),
+            optimistic_entities: dict.delete(
+              cache.optimistic_entities,
+              entity_id,
+            ),
+            optimistic_mutations: dict.delete(
+              cache.optimistic_mutations,
+              mutation_id,
+            ),
           )
         }
         Error(_) -> {
           // If we can't parse the response, just remove optimistic data
           Cache(
             ..cache,
-            optimistic_entities: dict.delete(cache.optimistic_entities, entity_id),
-            optimistic_mutations: dict.delete(cache.optimistic_mutations, mutation_id),
+            optimistic_entities: dict.delete(
+              cache.optimistic_entities,
+              entity_id,
+            ),
+            optimistic_mutations: dict.delete(
+              cache.optimistic_mutations,
+              mutation_id,
+            ),
           )
         }
       }
@@ -640,29 +727,24 @@ pub fn execute_optimistic_mutation(
   let mutation_id = "mutation-" <> int.to_string(cache.mutation_counter)
 
   // Apply optimistic update
-  let cache_with_optimistic = apply_optimistic_update(
-    cache,
-    mutation_id,
-    entity_id,
-    optimistic_updater,
-  )
+  let cache_with_optimistic =
+    apply_optimistic_update(cache, mutation_id, entity_id, optimistic_updater)
 
   // Increment mutation counter
-  let cache_with_counter = Cache(
-    ..cache_with_optimistic,
-    mutation_counter: cache.mutation_counter + 1,
-  )
+  let cache_with_counter =
+    Cache(..cache_with_optimistic, mutation_counter: cache.mutation_counter + 1)
 
   // Create the mutation effect
-  let effect = create_mutation_effect(
-    cache_with_counter,
-    registry,
-    query_name,
-    variables,
-    mutation_id,
-    parser,
-    on_response,
-  )
+  let effect =
+    create_mutation_effect(
+      cache_with_counter,
+      registry,
+      query_name,
+      variables,
+      mutation_id,
+      parser,
+      on_response,
+    )
 
   #(cache_with_counter, mutation_id, effect)
 }
@@ -677,12 +759,13 @@ fn create_mutation_effect(
   parser: fn(String) -> Result(data, String),
   on_response: fn(String, Result(data, String), String) -> msg,
 ) -> Effect(msg) {
-  case registry.get(registry, query_name) {
+  case registry_get(registry, query_name) {
     Ok(meta) -> {
       effect.from(fn(dispatch) {
         let headers = cache.get_headers()
         let client = squall.new(cache.endpoint, headers)
-        let assert Ok(req) = squall.prepare_request(client, meta.query, variables)
+        let assert Ok(req) =
+          squall.prepare_request(client, meta.query, variables)
 
         let _promise =
           send_with_credentials(req)
@@ -701,14 +784,22 @@ fn create_mutation_effect(
                         }
                         Error(err) -> {
                           // Parse error - dispatch error so app can rollback
-                          dispatch(on_response(mutation_id, Error("Parse error: " <> err), text.body))
+                          dispatch(on_response(
+                            mutation_id,
+                            Error("Parse error: " <> err),
+                            text.body,
+                          ))
                           promise.resolve(Nil)
                         }
                       }
                     }
                     Error(_) -> {
                       // Fetch error - dispatch error so app can rollback
-                      dispatch(on_response(mutation_id, Error("Failed to read response"), ""))
+                      dispatch(on_response(
+                        mutation_id,
+                        Error("Failed to read response"),
+                        "",
+                      ))
                       promise.resolve(Nil)
                     }
                   }
@@ -728,7 +819,11 @@ fn create_mutation_effect(
     Error(_) -> {
       // Query not found in registry - return error effect
       effect.from(fn(dispatch) {
-        dispatch(on_response(mutation_id, Error("Query not found in registry"), ""))
+        dispatch(on_response(
+          mutation_id,
+          Error("Query not found in registry"),
+          "",
+        ))
         Nil
       })
     }
@@ -744,7 +839,8 @@ fn denormalize(
 ) -> String {
   case json.parse(data_str, decode.dynamic) {
     Ok(parsed) -> {
-      let denormalized = denormalize_value(parsed, optimistic_entities, entities)
+      let denormalized =
+        denormalize_value(parsed, optimistic_entities, entities)
       json.to_string(denormalized)
     }
     Error(_) -> data_str
@@ -768,13 +864,14 @@ fn denormalize_value(
               // Look up the entity (optimistic first, then regular)
               case dict.get(optimistic_entities, entity_id) {
                 Ok(entity) -> entity
-                Error(_) -> case dict.get(entities, entity_id) {
-                  Ok(entity) -> entity
-                  Error(_) -> {
-                    // Entity not found, return the reference as-is
-                    json.object([#("__ref", json.string(entity_id))])
+                Error(_) ->
+                  case dict.get(entities, entity_id) {
+                    Ok(entity) -> entity
+                    Error(_) -> {
+                      // Entity not found, return the reference as-is
+                      json.object([#("__ref", json.string(entity_id))])
+                    }
                   }
-                }
               }
             }
             Error(_) -> {
@@ -793,7 +890,9 @@ fn denormalize_value(
       // Try array
       case decode.run(value, decode.list(decode.dynamic)) {
         Ok(items) -> {
-          json.array(items, fn(item) { denormalize_value(item, optimistic_entities, entities) })
+          json.array(items, fn(item) {
+            denormalize_value(item, optimistic_entities, entities)
+          })
         }
         Error(_) -> {
           // Scalar value, return as-is
@@ -835,7 +934,8 @@ pub fn lookup(
         Fresh | Stale -> {
           // Denormalize the data by replacing entity references with actual entities
           // Check optimistic entities first, then regular entities
-          let denormalized_data = denormalize(entry.data, cache.optimistic_entities, cache.entities)
+          let denormalized_data =
+            denormalize(entry.data, cache.optimistic_entities, cache.entities)
           case parser(denormalized_data) {
             Ok(parsed) -> #(cache, Data(parsed))
             Error(parse_err) -> #(cache, Failed("Parse error: " <> parse_err))
@@ -844,10 +944,8 @@ pub fn lookup(
       }
     Error(_) -> {
       // Not in cache - add to pending fetches
-      let updated_cache = Cache(
-        ..cache,
-        pending_fetches: set.insert(cache.pending_fetches, key),
-      )
+      let updated_cache =
+        Cache(..cache, pending_fetches: set.insert(cache.pending_fetches, key))
       #(updated_cache, Loading)
     }
   }
@@ -864,35 +962,36 @@ pub fn process_pending(
   let pending_list = set.to_list(cache.pending_fetches)
 
   // Create effects for each pending query
-  let effects = list.filter_map(pending_list, fn(key) {
-    // Extract query_name from key (format: "QueryName:{...}")
-    case parse_query_key(key) {
-      Ok(#(query_name, variables)) ->
-        case registry.get(registry, query_name) {
-          Ok(meta) -> {
-            // Create fetch effect using query string from registry
-            Ok(create_fetch_effect(
-              cache,
-              meta.query,
-              query_name,
-              variables,
-              on_response,
-            ))
+  let effects =
+    list.filter_map(pending_list, fn(key) {
+      // Extract query_name from key (format: "QueryName:{...}")
+      case parse_query_key(key) {
+        Ok(#(query_name, variables)) ->
+          case registry_get(registry, query_name) {
+            Ok(meta) -> {
+              // Create fetch effect using query string from registry
+              Ok(create_fetch_effect(
+                cache,
+                meta.query,
+                query_name,
+                variables,
+                on_response,
+              ))
+            }
+            Error(_) -> Error(Nil)
           }
-          Error(_) -> Error(Nil)
-        }
-      Error(_) -> Error(Nil)
-    }
-  })
+        Error(_) -> Error(Nil)
+      }
+    })
 
   // Mark all pending as loading
-  let cache_with_loading = list.fold(pending_list, cache, fn(c, key) {
-    case parse_query_key(key) {
-      Ok(#(query_name, variables)) ->
-        mark_loading(c, query_name, variables)
-      Error(_) -> c
-    }
-  })
+  let cache_with_loading =
+    list.fold(pending_list, cache, fn(c, key) {
+      case parse_query_key(key) {
+        Ok(#(query_name, variables)) -> mark_loading(c, query_name, variables)
+        Error(_) -> c
+      }
+    })
 
   // Clear pending fetches
   let final_cache = Cache(..cache_with_loading, pending_fetches: set.new())
@@ -997,7 +1096,11 @@ fn create_fetch_effect(
             })
           }
           Error(_) -> {
-            dispatch(on_response(query_name, variables, Error("Failed to fetch")))
+            dispatch(on_response(
+              query_name,
+              variables,
+              Error("Failed to fetch"),
+            ))
             promise.resolve(Nil)
           }
         }
@@ -1011,4 +1114,6 @@ fn create_fetch_effect(
 @external(javascript, "./squall_cache_ffi.mjs", "sendWithCredentials")
 fn send_with_credentials(
   req: request.Request(String),
-) -> promise.Promise(Result(response.Response(fetch.FetchBody), fetch.FetchError))
+) -> promise.Promise(
+  Result(response.Response(fetch.FetchBody), fetch.FetchError),
+)
